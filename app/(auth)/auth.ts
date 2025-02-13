@@ -2,25 +2,12 @@ import { compare } from 'bcrypt-ts';
 import NextAuth, { type User, type Session } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 
-import { getUser, createUser } from '@/lib/db/queries';
+import { getUser } from '@/lib/db/queries';
 import { authConfig } from './auth.config';
 
-interface ExtendedSession extends Session {
-  user: User;
-}
-
-async function createAnonymousUser() {
-  const anonymousEmail = `anon_${Date.now()}@anonymous.user`;
-  const anonymousPassword = `anon_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-
-  try {
-    await createUser(anonymousEmail, anonymousPassword);
-    const [user] = await getUser(anonymousEmail);
-    return user;
-  } catch (error) {
-    console.error('Failed to create anonymous user:', error);
-    return null;
-  }
+interface AuthorizeCredentials {
+  email?: string;
+  password?: string;
 }
 
 export const {
@@ -32,20 +19,27 @@ export const {
   ...authConfig,
   providers: [
     Credentials({
-      credentials: {},
-      async authorize({ email, password }: any) {
-        // Handle anonymous access
-        if (!email && !password) {
-          return await createAnonymousUser();
+      async authorize(credentials: AuthorizeCredentials) {
+        const { email, password } = credentials;
+
+        // Only allow explicit login with credentials
+        if (!email || !password) {
+          return null;
         }
 
-        // Handle regular authentication
         const users = await getUser(email);
         if (users.length === 0) return null;
-        // biome-ignore lint: Forbidden non-null assertion.
-        const passwordsMatch = await compare(password, users[0].password!);
+
+        const user = users[0];
+        if (!user.password) return null;
+
+        const passwordsMatch = await compare(password, user.password);
         if (!passwordsMatch) return null;
-        return users[0] as any;
+
+        return {
+          id: user.id,
+          email: user.email,
+        };
       },
     }),
   ],
@@ -53,29 +47,14 @@ export const {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-      } else if (!token.id) {
-        // Create anonymous user if no user exists
-        const anonymousUser = await createAnonymousUser();
-        if (anonymousUser) {
-          token.id = anonymousUser.id;
-          token.email = anonymousUser.email;
-        }
       }
-
       return token;
     },
-    async session({
-      session,
-      token,
-    }: {
-      session: ExtendedSession;
-      token: any;
-    }) {
+    async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
         session.user.email = token.email as string;
       }
-
       return session;
     },
   },

@@ -5,28 +5,28 @@ async function getOrCreateSession() {
   let session = await auth();
 
   // If no session exists, create an anonymous session
-  if (!session?.user) {
-    try {
-      const result = await signIn('credentials', {
-        redirect: false,
-      });
+  // if (!session?.user) {
+  //   try {
+  //     const result = await signIn('credentials', {
+  //       redirect: false,
+  //     });
 
-      if (result?.error) {
-        console.error('Failed to create anonymous session:', result.error);
-        return null;
-      }
+  //     if (result?.error) {
+  //       console.error('Failed to create anonymous session:', result.error);
+  //       return null;
+  //     }
 
-      session = await auth();
+  //     session = await auth();
 
-      if (!session?.user) {
-        console.error('Failed to get session after creation');
-        return null;
-      }
-    } catch (error) {
-      console.error('Error creating anonymous session:', error);
-      return null;
-    }
-  }
+  //     if (!session?.user) {
+  //       console.error('Failed to get session after creation');
+  //       return null;
+  //     }
+  //   } catch (error) {
+  //     console.error('Error creating anonymous session:', error);
+  //     return null;
+  //   }
+  // }
 
   return session;
 }
